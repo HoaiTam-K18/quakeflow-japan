@@ -1,0 +1,24 @@
+# Orchestration core
+dagster==1.7.2
+dagster-webserver==1.7.2
+dagster-postgres==0.23.2
+dagster-spark==0.23.2
+
+# Spark & dbt
+pyspark==3.4.1
+dbt-core==1.7.6
+dbt-postgres==1.7.6
+
+# Data lưu & tương tác
+pandas<2.10
+sqlalchemy>=2.0,<2.0.20
+pyarrow==16.0.0
+minio==7.2.5
+python-dotenv
+
+# Japan geocoder
+jageocoder>=2.1.9
+
+# Connectors
+pymysql>=1.0
+psycopg2-binary==2.9.9
