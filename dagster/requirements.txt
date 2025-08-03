@@ -1,0 +1,12 @@
+dagster
+dagit
+dagster-webserver
+dagster-postgres
+pyspark==3.4.1
+dbt-core==1.7.6
+dbt-postgres==1.7.6
+pandas
+sqlalchemy
+jageocoder
+minio
+python-dotenv
