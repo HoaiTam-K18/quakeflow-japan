@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+*.ipynb_checkpoints
+.env
+.venv/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VS Code settings
+.vscode/
+
+# DAGSTER local state
+dagster_home/
+dagster_logs/
+
+# PySpark temporary files
+.metastore_db/
+derby.log
+
+# MinIO volume
+minio/
+
+# Docker
+**/mysql/
+**/postgresql/
+**/__pycache__/
+docker-compose.override.yml
+
+# DBT artifacts
+dbt_modules/
+target/
+dbt_packages/
+
+
+# Parquet, CSV, data files (optional)
+*.parquet
+*.csv
+*.tsv
+*.json
+*.zip
+*.gz
+*.tar.gz
+data/
+datasets/
