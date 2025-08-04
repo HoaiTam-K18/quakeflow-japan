@@ -1,6 +1,22 @@
 version: "3.9"
 
 services:
+# Pipelines
+  etl_pipeline:
+    build:
+      context: ./etl_pipeline
+      dockerfile: ./Dockerfile
+    container_name: etl_pipeline
+    image: etl_pipeline:latest
+    volumes:
+      - ./etl_pipeline:/opt/dagster/app
+    env_file:
+      - .env
+    ports:
+      - "4000:4000" 
+    networks:
+      - de_network
+
   # MySQL
   quakeflow_japan_mysql:
     image: mysql:8.0
@@ -66,12 +82,15 @@ services:
 
   # Dagster build (custom)
   quakeflow_japan_dagster:
-    build:
-      context: ./dagster/
     container_name: quakeflow_japan_dagster
-    image: quakeflow_japan_dagster
+    build:
+      context: ./dagster
+    restart: on-failure
+    expose:
+      - "4001"
     networks:
       - de_network
+
 
   # Dagster UI (Dagit)
   quakeflow_japan_dagit:

@@ -1,31 +1,14 @@
+# Dagster libraries to run both dagit and the dagster-daemon. Does not
+# need to have access to any pipeline code.
 FROM python:3.10-slim
 
-# 1. Cài đặt các thư viện hệ thống cần thiết
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    default-jdk \
-    git \
-    curl \
-    libpq-dev \
-    gcc \
-    unzip \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-ENV PYTHONUNBUFFERED=1
-
-# 2. Tạo thư mục làm việc
-WORKDIR /opt/dagster/app
-
-# 3. Copy file requirements
-COPY requirements.txt .
-
-# 4. Cài đặt Python dependencies
-RUN pip install --upgrade pip && pip install -r requirements.txt
-
-# 5. Copy toàn bộ code vào image
-COPY . .
-
-# 6. Tạo DAGSTER_HOME nếu chưa có
+# Set $DAGSTER_HOME and copy dagster instance and workspace YAML there
 ENV DAGSTER_HOME=/opt/dagster/dagster_home
-RUN mkdir -p $DAGSTER_HOME
+RUN mkdir -p $DAGSTER_HOME && \
+    mkdir -p $DAGSTER_HOME/storage && \
+    mkdir -p $DAGSTER_HOME/compute_logs && \
+    mkdir -p $DAGSTER_HOME/local_artifact_storage
+WORKDIR $DAGSTER_HOME
+
+COPY requirements.txt $DAGSTER_HOME
+RUN pip install --upgrade pip && pip install -r requirements.txt

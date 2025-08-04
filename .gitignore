@@ -24,8 +24,13 @@ logs/
 .vscode/
 
 # DAGSTER local state
-dagster_home/
 dagster_logs/
+history/
+.telemetry/
+schedules/
+.nux/
+.logs_queue/
+.db
 
 # PySpark temporary files
 .metastore_db/
