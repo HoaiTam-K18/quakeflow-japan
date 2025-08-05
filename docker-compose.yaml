@@ -17,19 +17,6 @@ services:
     networks:
       - de_network
 
-  # MySQL
-  quakeflow_japan_mysql:
-    image: mysql:8.0
-    container_name: quakeflow_japan_mysql
-    volumes:
-      - ./mysql:/var/lib/mysql
-    ports:
-      - "3306:3306"
-    env_file:
-      - .env
-    networks:
-      - de_network
-
   # PostgreSQL
   quakeflow_japan_psql:
     image: postgres:15
