@@ -5,7 +5,7 @@ import os
 @asset(
     name="bronze__quake_raw_text",
     io_manager_key="minio_io_manager",
-    key_prefix=["bronze", "quake"],  # Đổi lại từ "raw" → "quake" cho rõ
+    key_prefix=["bronze", "quake"],
     compute_kind="Pandas"
 )
 def bronze__quake_raw_text() -> Output[pd.DataFrame]:
