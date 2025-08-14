@@ -15,7 +15,7 @@ services:
     ports:
       - "4000:4000" 
     networks:
-      - de_network
+      - quakeflow_japan_network
 
   # PostgreSQL
   quakeflow_japan_psql:
@@ -28,7 +28,7 @@ services:
     env_file:
       - .env
     networks:
-      - de_network
+      - quakeflow_japan_network
 
   # MinIO
   quakeflow_japan_minio:
@@ -44,7 +44,7 @@ services:
     env_file:
       - .env
     networks:
-      - de_network
+      - quakeflow_japan_network
 
   # MinIO Client
   quakeflow_japan_mc:
@@ -65,7 +65,7 @@ services:
     depends_on:
       - quakeflow_japan_minio
     networks:
-      - de_network
+      - quakeflow_japan_network
 
   # Dagster build (custom)
   quakeflow_japan_dagster:
@@ -76,7 +76,7 @@ services:
     expose:
       - "4001"
     networks:
-      - de_network
+      - quakeflow_japan_network
 
 
   # Dagster UI (Dagit)
@@ -101,7 +101,7 @@ services:
     env_file:
       - .env
     networks:
-      - de_network
+      - quakeflow_japan_network
 
   # Dagster Daemon
   quakeflow_japan_daemon:
@@ -116,22 +116,41 @@ services:
     env_file:
       - .env
     networks:
-      - de_network
+      - quakeflow_japan_network
 
-  # PySpark + Jupyter
-  quakeflow_japan_pyspark:
-    image: jupyter/pyspark-notebook:latest
-    container_name: quakeflow_japan_pyspark
-    ports:
-      - "8888:8888"
-    volumes:
-      - ./notebooks:/home/jovyan/work
+  # Spark
+  # Spark Master
+  spark-master:
+    image: bitnami/spark:latest
+    container_name: spark-master
+    hostname: spark-master
     environment:
-      - JUPYTER_ENABLE_LAB=yes
+      - SPARK_MODE=master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+    ports:
+      - "7077:7077"   # Spark Master service
+      - "8080:8080"   # Spark Master UI
     networks:
-      - de_network
+      - quakeflow_japan_network
+
+  spark-worker:
+    image: bitnami/spark:latest
+    deploy:
+      replicas: 2
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    depends_on:
+      - spark-master
+    networks:
+      - quakeflow_japan_network
 
 networks:
-  de_network:
+  quakeflow_japan_network:
     driver: bridge
-    name: de_network
+    name: quakeflow_japan_network
