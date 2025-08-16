@@ -1,7 +1,7 @@
 version: "3.9"
 
 services:
-# Pipelines
+  # Pipelines
   etl_pipeline:
     build:
       context: ./etl_pipeline
@@ -13,7 +13,7 @@ services:
     env_file:
       - .env
     ports:
-      - "4000:4000" 
+      - "4000:4000"
     networks:
       - quakeflow_japan_network
 
@@ -78,7 +78,6 @@ services:
     networks:
       - quakeflow_japan_network
 
-
   # Dagster UI (Dagit)
   quakeflow_japan_dagit:
     image: quakeflow_japan_dagster:latest
@@ -118,7 +117,6 @@ services:
     networks:
       - quakeflow_japan_network
 
-  # Spark
   # Spark Master
   spark-master:
     image: bitnami/spark:latest
@@ -130,27 +128,36 @@ services:
       - SPARK_RPC_ENCRYPTION_ENABLED=no
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
+      - SPARK_LOCAL_DIRS=/tmp
     ports:
       - "7077:7077"   # Spark Master service
       - "8080:8080"   # Spark Master UI
     networks:
       - quakeflow_japan_network
 
+  # Spark Worker
   spark-worker:
     image: bitnami/spark:latest
     deploy:
       replicas: 2
+    depends_on:
+      - spark-master
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=1G
       - SPARK_WORKER_CORES=1
-    depends_on:
-      - spark-master
+      - SPARK_RPC_AUTHENTICATION_ENABLED=no
+      - SPARK_RPC_ENCRYPTION_ENABLED=no
+      - SPARK_SSL_ENABLED=no
+      - SPARK_LOCAL_DIRS=/tmp
+    ports:
+      - "8081"
+      - "8082"
+
     networks:
       - quakeflow_japan_network
 
 networks:
   quakeflow_japan_network:
     driver: bridge
-    name: quakeflow_japan_network
