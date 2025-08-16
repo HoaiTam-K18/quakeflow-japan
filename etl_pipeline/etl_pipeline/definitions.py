@@ -1,10 +1,10 @@
 from dagster import Definitions, load_assets_from_modules
 
-from .assets.bronze import bronze__quakeflow_japan__earthquake_events
+from .assets import bronze, silver
 
 from .resources.minio_io_manager import MinIOIOManager
 
-all_assets = load_assets_from_modules([bronze__quakeflow_japan__earthquake_events])
+all_assets = load_assets_from_modules([bronze, silver])
 
 MINIO_CONFIG = {
     "endpoint_url": "localhost:9000",
