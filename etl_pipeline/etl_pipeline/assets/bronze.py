@@ -60,17 +60,17 @@ def bronze__raw_sliced(context, upstream: pd.DataFrame):
             lat_dev_raw = line[29:32].strip() or None
             longitude_raw = line[33:40].strip() or None
             lon_dev_raw = line[41:44].strip() or None
-            region_lead_raw = line[58:62].strip() or None
-            region_text_raw = line[63:93].rstrip() or None
+            region_lead_raw = line[58:64].strip() or None
+            region_text_raw = line[64:93].rstrip() or None
             shindo_raw = line[93:96].strip() or None
 
             rest = line[44:58].ljust(14)  # đảm bảo đủ độ dài để tránh index error
 
             # Độ sâu (6 ký tự đầu, thường là 5 số)
-            depth_raw = rest[:6].strip()
+            depth_raw = rest[:8].strip()
 
             # Magnitude 1
-            magnitude_raw_1 = rest[6:10].strip()
+            magnitude_raw_1 = rest[8:10].strip()
             magnitude_type_raw_1 = rest[10].strip() if rest[10].strip() else None
 
             # Magnitude 2 (có thể không có)
