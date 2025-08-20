@@ -3,12 +3,12 @@ import pandas as pd
 import os
 
 @asset(
-    name="bronze__raw_text",
+    name="bronze_raw_text",
     io_manager_key="minio_io_manager",
     key_prefix=["bronze", "quake"],
     compute_kind="Pandas"
 )
-def bronze__raw_text() -> Output[pd.DataFrame]:
+def bronze_raw_text() -> Output[pd.DataFrame]:
     folder_path = "./data/raw"
     all_files = [
         os.path.join(folder_path, f)
@@ -27,23 +27,37 @@ def bronze__raw_text() -> Output[pd.DataFrame]:
     df = pd.DataFrame(records)
     return Output(df, metadata={"num_files": len(all_files), "num_lines": len(df)})
 
+@asset(
+    name="bronze_raw_japan_geo",
+    io_manager_key="minio_io_manager",
+    key_prefix=["bronze", "quake"],
+    compute_kind="File"
+)
+def bronze_raw_japan_geo() -> Output[bytes]:
+    path = "./data/geo/gadm41_JPN_1.json"
+
+    with open(path, "rb") as f:
+        raw_bytes = f.read()
+
+    return Output(raw_bytes)
+
 
 @multi_asset(
     ins={
         "upstream": AssetIn(
-            key=["bronze", "quake", "bronze__raw_text"]
+            key=["bronze", "quake", "bronze_raw_text"]
         )
     },
     outs={
-        "bronze__raw_sliced": AssetOut(
+        "bronze_raw_sliced": AssetOut(
             io_manager_key="minio_io_manager",
             key_prefix=["bronze", "quake"]
         )
     },
     compute_kind="Pandas",
-    name="bronze__raw_sliced"
+    name="bronze_raw_sliced"
 )
-def bronze__raw_sliced(context, upstream: pd.DataFrame):
+def bronze_raw_sliced(context, upstream: pd.DataFrame):
     context.log.info("Slicing fixed-width lines (Bronze RAW, 96 chars each) — no type conversion")
 
     def parse_jma_line(line: str):
