@@ -1,0 +1,23 @@
+CREATE SCHEMA IF NOT EXISTS silver;
+
+CREATE TABLE IF NOT EXISTS silver.silver_dim_japan_province (
+    province_id      VARCHAR(10) PRIMARY KEY,
+    province_name    VARCHAR(255) NOT NULL,
+    geometry         TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS silver.silver_fact_earthquake_event (
+    event_id      VARCHAR(64) PRIMARY KEY,
+    event_time    TIMESTAMP NOT NULL,
+    latitude      DOUBLE PRECISION NOT NULL,
+    longitude     DOUBLE PRECISION NOT NULL,
+    depth_km      DOUBLE PRECISION,
+    magnitude     DOUBLE PRECISION,
+    mag_type      VARCHAR(10),
+    province_id   VARCHAR(10),
+    raw_place     TEXT,
+    CONSTRAINT fk_province
+        FOREIGN KEY (province_id)
+        REFERENCES silver.silver_dim_japan_province(province_id)
+        ON DELETE SET NULL
+);
