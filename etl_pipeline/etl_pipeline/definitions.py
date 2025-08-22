@@ -17,9 +17,9 @@ MINIO_CONFIG = {
 PSQL_CONFIG = {
     "host": "localhost",
     "port": 5432,
-    "database": "postgres",
-    "user": "admin",
-    "password": "admin123",
+    "database": "seismodistr_warehouse",
+    "user": "warehouse_user",
+    "password": "warehouse_pass",
 }
 
 defs = Definitions(
