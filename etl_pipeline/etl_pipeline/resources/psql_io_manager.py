@@ -27,7 +27,7 @@ class PostgreSQLIOManager(IOManager):
         pass
 
     def handle_output(self, context: OutputContext, obj):
-        schema = context.asset_key.path[-2]
+        schema = context.asset_key.path[0]
         table = context.asset_key.path[-1]
         tmp_tbl = f"{table}_tmp_{datetime.now().strftime('%Y_%m_%d')}"
 
@@ -40,29 +40,32 @@ class PostgreSQLIOManager(IOManager):
         datetime_columns = (context.metadata or {}).get("datetime_columns", [])
 
         if isinstance(obj, pd.DataFrame):
-            # --- Pandas DataFrame xử lý như cũ ---
+            # --- Pandas DataFrame ---
             for col in datetime_columns:
                 if col in obj.columns:
                     obj[col] = pd.to_datetime(obj[col], errors="coerce")
 
             with connect_psql(self._config) as db_conn:
                 with db_conn.connect() as cursor:
+                    # Tạo bảng tạm giống schema gốc
+                    cursor.execute(text(f'DROP TABLE IF EXISTS {schema}."{tmp_tbl}"'))
                     cursor.execute(
-                        text(f'CREATE TEMP TABLE IF NOT EXISTS "{tmp_tbl}" (LIKE {schema}."{table}" INCLUDING ALL)')
+                        text(f'CREATE TABLE "{schema}"."{tmp_tbl}" (LIKE "{schema}"."{table}" INCLUDING ALL)')
                     )
 
+                # Append data vào bảng tạm (schema giữ nguyên)
                 obj[ls_columns].to_sql(
                     name=tmp_tbl,
                     con=db_conn,
                     schema=schema,
-                    if_exists="replace",
+                    if_exists="append",  # thay vì replace
                     index=False,
                     chunksize=100000,
                     method="multi",
                 )
 
                 with db_conn.connect() as cursor:
-                    self._do_upsert(context, cursor, schema, table, tmp_tbl, primary_keys)
+                    self._do_upsert(context, cursor, schema, table, tmp_tbl, primary_keys, ls_columns)
 
         elif isinstance(obj, SparkDataFrame):
             # --- Spark DataFrame ---
@@ -92,38 +95,40 @@ class PostgreSQLIOManager(IOManager):
 
             with connect_psql(self._config) as db_conn:
                 with db_conn.connect() as cursor:
-                    self._do_upsert(context, cursor, schema, table, tmp_tbl, primary_keys)
+                    self._do_upsert(context, cursor, schema, table, tmp_tbl, primary_keys, ls_columns)
 
         else:
             raise TypeError("PostgreSQLIOManager only supports pandas.DataFrame or pyspark.sql.DataFrame")
 
-    def _do_upsert(self, context, cursor, schema, table, tmp_tbl, primary_keys):
+    def _do_upsert(self, context, cursor, schema, table, tmp_tbl, primary_keys, ls_columns):
         # Kiểm tra số bản ghi bảng tạm
-        result = cursor.execute(text(f'SELECT COUNT(*) FROM {schema}."{tmp_tbl}"'))
+        result = cursor.execute(text(f'SELECT COUNT(*) FROM "{schema}"."{tmp_tbl}"'))
         for row in result:
             context.log.info(f"Temp table records: {row[0]}")
 
+        col_list = ",".join([f'"{c}"' for c in ls_columns])
+
         if len(primary_keys) > 0:
             conditions = " AND ".join(
-                [f'{schema}.{table}."{k}" = {tmp_tbl}."{k}"' for k in primary_keys]
+                [f'"{schema}"."{table}"."{k}" = "{tmp_tbl}"."{k}"' for k in primary_keys]
             )
             command = f"""
             BEGIN;
-            DELETE FROM {schema}.{table}
-            USING {tmp_tbl}
+            DELETE FROM "{schema}"."{table}"
+            USING "{schema}"."{tmp_tbl}"
             WHERE {conditions};
-            INSERT INTO {schema}.{table}
-            SELECT * FROM {tmp_tbl};
+            INSERT INTO "{schema}"."{table}" ({col_list})
+            SELECT {col_list} FROM "{schema}"."{tmp_tbl}";
             COMMIT;
             """
         else:
             command = f"""
             BEGIN;
-            TRUNCATE TABLE {schema}.{table};
-            INSERT INTO {schema}.{table}
-            SELECT * FROM {tmp_tbl};
+            TRUNCATE TABLE "{schema}"."{table}";
+            INSERT INTO "{schema}"."{table}" ({col_list})
+            SELECT {col_list} FROM "{schema}"."{tmp_tbl}";
             COMMIT;
             """
 
         cursor.execute(text(command))
-        cursor.execute(text(f'DROP TABLE IF EXISTS {schema}."{tmp_tbl}"'))
+        cursor.execute(text(f'DROP TABLE IF EXISTS "{schema}"."{tmp_tbl}"'))
