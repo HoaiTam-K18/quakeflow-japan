@@ -33,13 +33,14 @@ def bronze_raw_text() -> Output[pd.DataFrame]:
     key_prefix=["bronze", "quake"],
     compute_kind="File"
 )
-def bronze_raw_japan_geo() -> Output[bytes]:
+def bronze_raw_japan_geo() -> Output[str]:
     path = "./data/geo/gadm41_JPN_1.json"
 
-    with open(path, "rb") as f:
-        raw_bytes = f.read()
+    with open(path, "r", encoding="utf-8") as f:   # đọc text
+        raw_str = f.read()
 
-    return Output(raw_bytes)
+    return Output(raw_str)
+
 
 
 @multi_asset(
