@@ -7,6 +7,7 @@ import logging
 
 import geopandas as gpd
 from shapely.geometry import Point, shape
+from sedona.register import SedonaRegistrator
 
 @multi_asset(
     ins={
@@ -157,72 +158,6 @@ def silver_quake_event(context, upstream):
 
     return Output(df)
 
-@multi_asset(
-    ins={
-        "upstream": AssetIn(key=["silver", "quake", "silver_quake_event"])
-    },
-    outs={
-        "silver_fact_earthquake_event": AssetOut(
-            io_manager_key="psql_io_manager",
-            key_prefix=["silver", "fact"],
-            metadata={
-                "primary_keys": ["event_id"],
-                "datetime_columns": ["event_time"],
-                "columns": [
-                    "event_id", "event_time", "latitude", "longitude",
-                    "depth_km", "magnitude", "mag_type", "province_id", "raw_place"
-                ]
-            },
-        )
-    },
-    compute_kind="Pyspark",
-    name="silver_fact_earthquake_event"
-)
-def silver_fact_earthquake_event(context, upstream: DataFrame):
-    """
-    Transform từ silver_quake_event -> bảng fact earthquake_event
-    """
-
-    # Add surrogate key
-    df = upstream.withColumn(
-        "event_id",
-        F.sha2(
-            F.concat_ws(
-                "_",
-                F.col("event_time").cast("string"),
-                F.col("latitude").cast("string"),
-                F.col("longitude").cast("string"),
-                F.col("depth").cast("string")
-            ),
-            256
-        )
-    )
-
-    # Chuẩn hóa tên cột cho fact table
-    df_fact = (
-        df.select(
-            "event_id",
-            "event_time",
-            F.col("latitude").alias("latitude"),
-            F.col("longitude").alias("longitude"),
-            F.col("depth").alias("depth_km"),
-            F.coalesce(F.col("magnitude_1"), F.col("magnitude_2")).alias("magnitude"),
-            F.when(F.col("magnitude_1").isNotNull(), F.col("magnitude_type_1"))
-             .otherwise(F.col("magnitude_type_2")).alias("mag_type"),
-            F.col("region_lead").alias("province_id"),  # sau này join geo để thay = province_id
-            F.col("region_text").alias("raw_place")
-        )
-    )
-
-    context.log.info(f"Số dòng fact table: {df_fact.count()}")
-    df_fact.show(5)
-
-    return Output(df_fact, output_name="silver_fact_earthquake_event")
-
-
-
-
-from sedona.register import SedonaRegistrator
 
 @multi_asset(
     ins={
@@ -237,7 +172,6 @@ from sedona.register import SedonaRegistrator
                 "columns": [
                     "province_id",
                     "province_name",
-                    "admin_level",
                     "geometry"
                 ],
             },
@@ -261,6 +195,9 @@ def silver_dim_japan_province(context, upstream):
     SedonaRegistrator.registerAll(spark)
 
     # Load GeoJSON
+    context.log.info(f"Type of upstream: {type(upstream)}")
+    context.log.info(f"Value of upstream: {upstream}")
+
     raw = spark.read.option("multiline", "true").json(upstream)
     features = raw.select(F.explode("features").alias("feature"))
 
@@ -270,7 +207,6 @@ def silver_dim_japan_province(context, upstream):
         .select(
             F.col("feature.properties.GID_1").alias("province_id"),
             F.col("feature.properties.NAME_1").alias("province_name"),
-            F.col("feature.properties.TYPE_1").alias("admin_level"),
             F.expr("ST_GeomFromGeoJSON(geom_json)").alias("geometry")
         )
         .dropDuplicates(["province_id"])
@@ -282,6 +218,88 @@ def silver_dim_japan_province(context, upstream):
 
     # Trả về PandasDF + metadata
     return Output(
-        provinces,
+        provinces.toPandas(),
         metadata={"num_records": n}
     )
+
+@multi_asset(
+    ins={
+        "events": AssetIn(key=["silver", "quake", "silver_quake_event"]),
+        "provinces": AssetIn(key=["silver", "quake", "silver_dim_japan_province"]),
+    },
+    outs={
+        "silver_fact_earthquake_event": AssetOut(
+            io_manager_key="psql_io_manager",
+            key_prefix=["silver", "fact"],
+            metadata={
+                "primary_keys": ["event_id"],
+                "datetime_columns": ["event_time"],
+                "columns": [
+                    "event_id","event_time","latitude","longitude",
+                    "depth_km","magnitude","mag_type","province_id","raw_place"
+                ],
+            },
+        ),
+    },
+    compute_kind="Pyspark",
+    name="silver_fact_earthquake_event",
+)
+def silver_fact_earthquake_event(context, events: DataFrame, provinces: DataFrame):
+    spark = events.sparkSession
+    SedonaRegistrator.registerAll(spark)
+
+    # Tạo surrogate key cho event
+    events_hashed = events.withColumn(
+        "event_id",
+        F.sha2(
+            F.concat_ws(
+                "_",
+                F.col("event_time").cast("string"),
+                F.col("latitude").cast("string"),
+                F.col("longitude").cast("string"),
+                F.col("depth").cast("string"),
+            ),
+            256,
+        ),
+    )
+
+    # Tạo point geometry từ lon/lat
+    events_geo = (
+        events_hashed
+        .withColumn(
+            "point",
+            F.expr("ST_Point(double(longitude), double(latitude))")
+        )
+    )
+
+    # Đưa provinces từ WKT -> Sedona geometry để join
+    prov_geo = (
+        provinces
+        .withColumn("geom", F.expr("ST_GeomFromWKT(geometry)"))
+        .select("province_id", "province_name", "admin_level", "geom")
+    )
+
+    # Broadcast 47 tỉnh để join nhanh và dùng ST_Intersects (lấy luôn điểm nằm biên)
+    joined = (
+        events_geo
+        .join(F.broadcast(prov_geo), F.expr("ST_Intersects(prov_geo.geom, events_geo.point)"), "left")
+    )
+
+    # Chuẩn hóa cột fact
+    df_fact = (
+        joined.select(
+            "event_id",
+            "event_time",
+            F.col("latitude"),
+            F.col("longitude"),
+            F.col("depth").alias("depth_km"),
+            F.coalesce(F.col("magnitude_1"), F.col("magnitude_2")).alias("magnitude"),
+            F.when(F.col("magnitude_1").isNotNull(), F.col("magnitude_type_1"))
+             .otherwise(F.col("magnitude_type_2")).alias("mag_type"),
+            F.col("province_id"),
+            F.col("region_text").alias("raw_place"),
+        )
+    )
+
+    context.log.info(f"Số dòng fact sau join: {df_fact.count()}")
+    return Output(df_fact, output_name="silver_fact_earthquake_event")
