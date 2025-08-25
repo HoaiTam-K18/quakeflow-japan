@@ -7,16 +7,42 @@ import logging
 
 import geopandas as gpd
 from shapely.geometry import Point, shape
-from sedona.register import SedonaRegistrator
+from sedona.spark import SedonaContext
+
+POSTGRES_JAR = "/Users/hoaitam/spark-jars/postgresql-42.7.3.jar"
+SEDONA_JARS = (
+    "/Users/hoaitam/spark-jars/sedona-spark-shaded-3.4_2.12-1.5.1.jar,"
+    "/Users/hoaitam/spark-jars/geotools-wrapper-1.5.1-28.2.jar"
+)
+
+def get_spark(app_name: str):
+    spark = (
+        SparkSession.builder
+        .appName(app_name)
+        .config("spark.jars", f"{POSTGRES_JAR},{SEDONA_JARS}")
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.kryo.registrator", "org.apache.sedona.core.serde.SedonaKryoRegistrator")
+        .config("spark.driver.memory", "4g")
+        .config("spark.executor.memory", "4g")
+        .config("spark.sql.execution.arrow.pyspark.enabled", "true")
+        .getOrCreate()
+    )
+
+    # Giảm log level để tránh spam "Skipping Sedona..."
+    spark.sparkContext.setLogLevel("ERROR")
+
+    return spark
+
+
 
 @multi_asset(
     ins={
         "upstream": AssetIn(key=["bronze", "quake", "bronze_raw_sliced"])
     },
     outs={
-    "silver_quake_event": AssetOut(
-        io_manager_key="minio_io_manager",
-        key_prefix=["silver", "quake"]
+        "silver_quake_event": AssetOut(
+            io_manager_key="minio_io_manager",
+            key_prefix=["silver", "quake"]
         )
     },
     compute_kind="Pyspark",
@@ -27,21 +53,15 @@ def silver_quake_event(context, upstream):
     context.log.setLevel(logging.INFO)
     context.log.info("Bắt đầu xử lý asset silver_quake_event")
 
-    # Khởi tạo Spark session với cấu hình tối ưu
-    spark = SparkSession.builder \
-        .appName("silver_quake_event") \
-        .config("spark.driver.memory", "8g") \
-        .config("spark.executor.memory", "8g") \
-        .config("spark.executor.cores", "4") \
-        .config("spark.executor.instances", "4") \
-        .config("spark.sql.shuffle.partitions", "100") \
-        .config("spark.default.parallelism", "100") \
-        .config("spark.memory.offHeap.enabled", "true") \
-        .config("spark.memory.offHeap.size", "4g") \
-        .config("spark.sql.adaptive.enabled", "true") \
+    # Khởi tạo Spark session với JDBC driver
+    spark = (
+        SparkSession.builder
+        .appName("silver_quake_event")
+        .config("spark.jars", POSTGRES_JAR)
         .getOrCreate()
+    )
 
-    # Định nghĩa schema
+    # Schema và xử lý như cũ...
     schema = StructType([
         StructField("record_type", StringType(), True),
         StructField("event_time", StringType(), True),
@@ -57,7 +77,7 @@ def silver_quake_event(context, upstream):
         StructField("magnitude_type_2", StringType(), True),
         StructField("region_lead", StringType(), True),
         StructField("region_text", StringType(), True),
-        StructField("shindo", StringType(), True)
+        StructField("shindo", StringType(), True),
     ])
 
     # Kiểm tra kiểu dữ liệu của upstream
@@ -153,11 +173,7 @@ def silver_quake_event(context, upstream):
             .withColumn("magnitude_2", col("magnitude_2").cast("float") / 10)
             .withColumn("shindo_value", map_shindo_udf(col("shindo"))))
 
-
-    df.show(10)
-
     return Output(df)
-
 
 @multi_asset(
     ins={
@@ -169,11 +185,7 @@ def silver_quake_event(context, upstream):
             key_prefix=["silver", "quake"],
             metadata={
                 "primary_keys": ["province_id"],
-                "columns": [
-                    "province_id",
-                    "province_name",
-                    "geometry"
-                ],
+                "columns": ["province_id", "province_name", "geometry"],
             },
         )
     },
@@ -183,20 +195,9 @@ def silver_quake_event(context, upstream):
 def silver_dim_japan_province(context, upstream):
     context.log.info("Bắt đầu xử lý asset silver_dim_japan_province")
 
-    spark = SparkSession.builder \
-        .appName("silver_dim_japan_province") \
-        .config("spark.jars",
-            "/Users/hoaitam/spark-jars/sedona-spark-shaded-3.4_2.12-1.5.1.jar,"
-            "/Users/hoaitam/spark-jars/geotools-wrapper-1.5.1-28.2.jar") \
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-        .config("spark.kryo.registrator", "org.apache.sedona.core.serde.SedonaKryoRegistrator") \
-        .getOrCreate()
+    spark = get_spark("silver_dim_japan_province")
 
-    SedonaRegistrator.registerAll(spark)
-
-    # Load GeoJSON
-    context.log.info(f"Type of upstream: {type(upstream)}")
-    context.log.info(f"Value of upstream: {upstream}")
+    sedona = SedonaContext.create(spark)
 
     raw = spark.read.option("multiline", "true").json(upstream)
     features = raw.select(F.explode("features").alias("feature"))
@@ -210,17 +211,15 @@ def silver_dim_japan_province(context, upstream):
             F.expr("ST_GeomFromGeoJSON(geom_json)").alias("geometry")
         )
         .dropDuplicates(["province_id"])
-        .withColumn("geometry", F.expr("ST_AsText(geometry)"))  # convert geometry to WKT
+        .withColumn("geometry", F.expr("ST_AsText(geometry)"))
     )
 
     n = provinces.count()
     context.log.info(f"Provinces loaded: {n}")
 
-    # Trả về PandasDF + metadata
-    return Output(
-        provinces.toPandas(),
-        metadata={"num_records": n}
-    )
+    return Output(provinces, metadata={"num_records": n})
+
+
 
 @multi_asset(
     ins={
@@ -244,10 +243,42 @@ def silver_dim_japan_province(context, upstream):
     compute_kind="Pyspark",
     name="silver_fact_earthquake_event",
 )
-def silver_fact_earthquake_event(context, events: DataFrame, provinces: DataFrame):
-    spark = events.sparkSession
-    SedonaRegistrator.registerAll(spark)
+def silver_fact_earthquake_event(context, events, provinces):
+    spark = get_spark("silver_fact_earthquake_event")
+    sedona = SedonaContext.create(spark)
 
+    # Convert events (Pandas → Spark nếu cần)
+    if isinstance(events, pd.DataFrame):
+        context.log.info("Events là Pandas DF, convert sang Spark")
+        if len(events) > 100000:
+            chunk_size = 500000
+            chunks = [events[i:i+chunk_size] for i in range(0, len(events), chunk_size)]
+            df = None
+            for i, chunk in enumerate(chunks):
+                chunk_df = spark.createDataFrame(chunk)
+                df = chunk_df if df is None else df.union(chunk_df)
+            events = df
+        else:
+            events = spark.createDataFrame(events)
+
+    # Convert provinces (Pandas → Spark nếu cần)
+    if isinstance(provinces, pd.DataFrame):
+        context.log.info("Provinces là Pandas DF, convert sang Spark")
+        provinces = spark.createDataFrame(provinces)
+
+    # Debug info
+    if events is not None and hasattr(events, "printSchema"):
+        events.printSchema()
+        context.log.info(f"events.count() = {events.count()}")
+    else:
+        context.log.error("events is None or not a Spark DataFrame")
+        return Output(None)
+
+    if provinces is None or not hasattr(provinces, "printSchema"):
+        raise ValueError("❌ provinces is None hoặc không phải Spark DataFrame")
+
+
+    # ✅ Bỏ check "geometry" trong events (chỉ cần lat/lon để tạo point)
     # Tạo surrogate key cho event
     events_hashed = events.withColumn(
         "event_id",
@@ -276,13 +307,17 @@ def silver_fact_earthquake_event(context, events: DataFrame, provinces: DataFram
     prov_geo = (
         provinces
         .withColumn("geom", F.expr("ST_GeomFromWKT(geometry)"))
-        .select("province_id", "province_name", "admin_level", "geom")
+        .select("province_id", "province_name", "geom")
     )
 
-    # Broadcast 47 tỉnh để join nhanh và dùng ST_Intersects (lấy luôn điểm nằm biên)
+    # Broadcast join
     joined = (
-        events_geo
-        .join(F.broadcast(prov_geo), F.expr("ST_Intersects(prov_geo.geom, events_geo.point)"), "left")
+        events_geo.alias("events_geo")
+        .join(
+            F.broadcast(prov_geo).alias("prov_geo"),
+            F.expr("ST_Intersects(prov_geo.geom, events_geo.point)"),
+            "left"
+        )
     )
 
     # Chuẩn hóa cột fact
@@ -301,5 +336,10 @@ def silver_fact_earthquake_event(context, events: DataFrame, provinces: DataFram
         )
     )
 
-    context.log.info(f"Số dòng fact sau join: {df_fact.count()}")
+    df_fact = df_fact.dropDuplicates(["event_id"])
+
+    context.log.info(f"Fact schema: {df_fact.printSchema()}")
+    context.log.info(f"Sample fact rows:\n{df_fact.limit(5).toPandas()}")
+
+
     return Output(df_fact, output_name="silver_fact_earthquake_event")
