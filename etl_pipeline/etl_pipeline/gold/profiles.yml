@@ -1,0 +1,12 @@
+gold:
+  outputs:
+    dev:
+      dbname: seismodistr_warehouse
+      host: quakeflow_japan_psql
+      pass: warehouse_pass
+      port: 5432
+      schema: gold
+      threads: 1
+      type: postgres
+      user: warehouse_user
+  target: dev
