@@ -278,7 +278,6 @@ def silver_fact_earthquake_event(context, events, provinces):
         raise ValueError("❌ provinces is None hoặc không phải Spark DataFrame")
 
 
-    # ✅ Bỏ check "geometry" trong events (chỉ cần lat/lon để tạo point)
     # Tạo surrogate key cho event
     events_hashed = events.withColumn(
         "event_id",
