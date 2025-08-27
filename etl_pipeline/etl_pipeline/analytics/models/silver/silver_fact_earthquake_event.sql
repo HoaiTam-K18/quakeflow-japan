@@ -1,0 +1,2 @@
+SELECT *
+FROM silver.silver_fact_earthquake_event
