@@ -5,8 +5,6 @@ from pyspark.sql.functions import col, substring, to_timestamp
 import pandas as pd
 import logging
 
-import geopandas as gpd
-from shapely.geometry import Point, shape
 from sedona.spark import SedonaContext
 
 POSTGRES_JAR = "/Users/hoaitam/spark-jars/postgresql-42.7.3.jar"
@@ -231,14 +229,25 @@ def silver_dim_japan_province(context, upstream):
             io_manager_key="psql_io_manager",
             key_prefix=["silver", "fact"],
             metadata={
-                "primary_keys": ["event_id"],
-                "datetime_columns": ["event_time"],
                 "columns": [
-                    "event_id","event_time","latitude","longitude",
-                    "depth_km","magnitude","mag_type","province_id","raw_place"
+                    "event_id",
+                    "event_time",
+                    "station_count",
+                    "latitude",
+                    "longitude",
+                    "depth_km",
+                    "magnitude_1",
+                    "magnitude_type_1",
+                    "magnitude_2",
+                    "magnitude_type_2",
+                    "shindo_value",
+                    "province_id",
+                    "raw_place",
                 ],
+                "primary_key": ["event_id"],
+                "datetime_column": "event_time",
             },
-        ),
+        )
     },
     compute_kind="Pyspark",
     name="silver_fact_earthquake_event",
@@ -319,23 +328,29 @@ def silver_fact_earthquake_event(context, events, provinces):
         )
     )
 
-    # Chuẩn hóa cột fact
+    # Chuẩn hóa cột fact (giữ đủ thông tin)
     df_fact = (
         joined.select(
             "event_id",
             "event_time",
+            F.col("station_count"),
             F.col("latitude"),
             F.col("longitude"),
             F.col("depth").alias("depth_km"),
-            F.coalesce(F.col("magnitude_1"), F.col("magnitude_2")).alias("magnitude"),
-            F.when(F.col("magnitude_1").isNotNull(), F.col("magnitude_type_1"))
-             .otherwise(F.col("magnitude_type_2")).alias("mag_type"),
+
+            F.col("magnitude_1"),
+            F.col("magnitude_type_1"),
+            F.col("magnitude_2"),
+            F.col("magnitude_type_2"),
+
             F.col("province_id"),
             F.col("region_text").alias("raw_place"),
+            F.col("shindo_value"),
         )
     )
 
     df_fact = df_fact.dropDuplicates(["event_id"])
+
 
     context.log.info(f"Fact schema: {df_fact.printSchema()}")
     context.log.info(f"Sample fact rows:\n{df_fact.limit(5).toPandas()}")
