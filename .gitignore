@@ -56,7 +56,6 @@ dbt_packages/
 *.parquet
 *.csv
 *.tsv
-*.json
 *.zip
 *.gz
 *.tar.gz
