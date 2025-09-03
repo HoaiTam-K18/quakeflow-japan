@@ -19,23 +19,9 @@ lý Nhật Bản, và hiển thị phân tích trên **Metabase**.
 -   **Data Source**: [JMA 地震月報 / Bulletin of the
     Earthquake](https://www.data.jma.go.jp/eqev/data/bulletin/hypo.html#nheader)
 
----
+------------------------------------------------------------------------
 
 ## 🏗️ アーキテクチャ / Kiến trúc pipeline
-
-**注意 / Note:** Mermaid をサポートしていないビューアでは図が表示されません。GitHub 上でレンダリングする場合は、コードブロックを **```mermaid** で囲み、各矢印（edge）を **必ず別行** に記述してください。  
-Nếu trình xem của bạn không hỗ trợ Mermaid, dùng phần fallback ASCII phía dưới.
-
-```mermaid
-flowchart TD
-  A[Raw JMA text files] -- Ingest --> B[Bronze Layer<br>(MinIO)]
-  A2[GeoJSON GADM Japan] --> B
-  B --> C[Silver Layer<br>(Spark / Sedona / PostgreSQL)]
-  C --> D[Gold Models<br>(SQL Views / Tables)]
-  D --> E[Metabase Dashboard]
-```
-
-**もし Mermaid がレンダリングされない場合の代替（ASCII） / Fallback (ASCII) if Mermaid doesn't render:**
 
 ```
 Raw JMA text files --(Ingest)--> Bronze Layer (MinIO)
@@ -45,7 +31,7 @@ Silver Layer --> Gold Models (SQL Views / Tables)
 Gold Models --> Metabase Dashboard
 ```
 
----
+------------------------------------------------------------------------
 
 ## 🗂️ Asset 一覧 / Danh sách Asset
 
