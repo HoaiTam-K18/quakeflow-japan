@@ -36,47 +36,75 @@ flowchart TD
 
 ## 🗂️ Asset 一覧 / Danh sách Asset
 
-  ------------------------------------------------------------------------------------------
-  Layer        Asset 名 (日本語)                        Asset mô tả (Tiếng Việt)
-  ------------ ---------------------------------------- ------------------------------------
-  **Bronze**   bronze_raw_text                          Dữ liệu text động đất gốc từ JMA,
-                                                        lưu từng dòng.
+### **Bronze Layer**
 
-               bronze_raw_japan_geo                     Dữ liệu bản đồ địa lý Nhật Bản
-                                                        (GeoJSON, ranh giới tỉnh).
+-   **bronze_raw_text**\
+    日本語: 気象庁 (JMA) 提供の地震テキストデータを行単位で保存。\
+    Tiếng Việt: Dữ liệu text động đất gốc từ JMA, lưu từng dòng.
 
-               bronze_raw_sliced                        Các dòng text đã cắt theo format cố
-                                                        định 96 ký tự, mỗi trường tách
-                                                        riêng.
+-   **bronze_raw_japan_geo**\
+    日本語: 日本の行政区域データ (GeoJSON、都道府県の境界)。\
+    Tiếng Việt: Dữ liệu bản đồ địa lý Nhật Bản (GeoJSON, ranh giới
+    tỉnh).
 
-  **Silver**   silver_quake_event                       Dữ liệu động đất đã chuẩn hoá: tọa
-                                                        độ (decimal), độ sâu (km),
-                                                        magnitude, Shindo.
+-   **bronze_raw_sliced**\
+    日本語: 固定長 (96 文字)
+    フォーマットで各フィールドを分割したデータ。\
+    Tiếng Việt: Các dòng text đã cắt theo format cố định 96 ký tự, mỗi
+    trường tách riêng.
 
-               silver_dim_japan_province                Bảng dimension lưu danh sách tỉnh
-                                                        Nhật, với hình học (WKT geometry).
+------------------------------------------------------------------------
 
-               silver_fact_earthquake_event             Bảng fact lưu các sự kiện động đất,
-                                                        gắn với tỉnh qua join không gian.
+### **Silver Layer**
 
-  **Gold**     gold_total_quakes_by_year                Thống kê tổng số trận động đất theo
-                                                        năm.
+-   **silver_quake_event**\
+    日本語: 緯度経度 (10進数)、深さ
+    (km)、マグニチュード、震度を正規化した地震データ。\
+    Tiếng Việt: Dữ liệu động đất đã chuẩn hoá: tọa độ (decimal), độ sâu
+    (km), magnitude, Shindo.
 
-               gold_earthquake_by_month                 Thống kê động đất theo từng tháng.
+-   **silver_dim_japan_province**\
+    日本語: 日本の都道府県リスト (WKT 形式のジオメトリを含む)。\
+    Tiếng Việt: Bảng dimension lưu danh sách tỉnh Nhật, với hình học
+    (WKT geometry).
 
-               gold_earthquake_by_province              Số lượng động đất theo từng tỉnh.
+-   **silver_fact_earthquake_event**\
+    日本語:
+    空間結合で都道府県に関連付けられた地震イベントのファクトテーブル。\
+    Tiếng Việt: Bảng fact lưu các sự kiện động đất, gắn với tỉnh qua
+    join không gian.
 
-               gold_earthquake_by_province_year         Số lượng động đất theo tỉnh theo
-                                                        từng năm.
+------------------------------------------------------------------------
 
-               gold_earthquake_magnitude_distribution   Phân phối động đất theo độ lớn
-                                                        (Magnitude).
+### **Gold Layer (BI Models)**
 
-               gold_earthquake_depth_distribution       Phân phối động đất theo độ sâu
-                                                        (Depth).
+-   **gold_total_quakes_by_year**\
+    日本語: 年ごとの地震回数を集計。\
+    Tiếng Việt: Thống kê tổng số trận động đất theo năm.
 
-               gold_quake_shindo_proportion             Tỷ lệ động đất theo cấp độ Shindo.
-  ------------------------------------------------------------------------------------------
+-   **gold_earthquake_by_month**\
+    日本語: 月ごとの地震回数を集計。\
+    Tiếng Việt: Thống kê động đất theo từng tháng.
+
+-   **gold_earthquake_by_province**\
+    日本語: 都道府県ごとの地震回数を集計。\
+    Tiếng Việt: Số lượng động đất theo từng tỉnh.
+
+-   **gold_earthquake_by_province_year**\
+    日本語: 年 × 都道府県ごとの地震回数を集計。\
+    Tiếng Việt: Số lượng động đất theo tỉnh theo từng năm.
+
+-   **gold_earthquake_magnitude_distribution**\
+    日本語: マグニチュード区間ごとの地震分布。\
+    Tiếng Việt: Phân phối động đất theo độ lớn (Magnitude).
+
+-   **gold_earthquake_depth_distribution**\
+    日本語: 深さ (km) ごとの地震分布。\
+    Tiếng Việt: Phân phối động đất theo độ sâu (Depth).
+
+-   **gold_quake_shindo_proportion**\
+    日本語: 震度の割合を計算。\
+    Tiếng Việt: Tỷ lệ động đất theo cấp độ Shindo.
 
 ------------------------------------------------------------------------
 
