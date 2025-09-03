@@ -24,7 +24,7 @@ lý Nhật Bản, và hiển thị phân tích trên **Metabase**.
 ## 🏗️ アーキテクチャ / Kiến trúc pipeline
 
 flowchart TD
-    A[Raw JMA text files] -- Ingest --> B[Bronze Layer (MinIO)]
+    A[Raw JMA text files] --> B[Bronze Layer (MinIO)]
     A2[GeoJSON GADM Japan] --> B
     B --> C[Silver Layer (Spark/Sedona, PostgreSQL)]
     C --> D[Gold Models (SQL Views/Tables)]
