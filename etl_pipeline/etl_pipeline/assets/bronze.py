@@ -25,7 +25,18 @@ def bronze_raw_text() -> Output[pd.DataFrame]:
                         "raw_line": line.rstrip("\n")
                     })
     df = pd.DataFrame(records)
-    return Output(df, metadata={"num_files": len(all_files), "num_lines": len(df)})
+    return Output(
+        df, 
+        metadata={
+            "description": "Raw earthquake text lines ingested from JMA files.",
+            "layer": "bronze",
+            "source": "Local ./data/raw directory",
+            "columns": ["filename", "raw_line"],
+            "format": "text",
+            "num_files": len(all_files), 
+            "num_lines": len(df)
+        }
+    )
 
 @asset(
     name="bronze_raw_japan_geo",
@@ -39,7 +50,16 @@ def bronze_raw_japan_geo() -> Output[str]:
     with open(path, "r", encoding="utf-8") as f:   # đọc text
         raw_str = f.read()
 
-    return Output(raw_str)
+    return Output(
+        raw_str,
+        metadata={
+            "description": "Raw Japan province boundaries from GADM GeoJSON.",
+            "layer": "bronze",
+            "source": "./data/geo/gadm41_JPN_1.json",
+            "format": "GeoJSON",
+            "columns": ["geometry_json"]
+        }
+    )
 
 
 
@@ -117,8 +137,15 @@ def bronze_raw_sliced(context, upstream: pd.DataFrame):
         metadata={
             "columns": list(df.columns),
             "record_count": len(df),
-            "note": "All fields are strings; Silver layer will parse/convert.",
-            "description": "This dataset contains raw sliced earthquake data from JMA files, with each line parsed into fixed-width fields (96 chars). Fields include event time, coordinates, magnitude, and region details, preserved as strings for further processing in the Silver layer.",
-            "processing_note": "No type conversion or validation performed; ensure Silver layer handles parsing (e.g., latitude_raw as ddmmss to decimal degrees)."
+            "description": "Fixed-width parsed earthquake records (96 chars) from JMA text files.",
+            "layer": "bronze",
+            "columns": [
+                "record_type","event_time_raw","station_count_raw",
+                "latitude_raw","lat_dev_raw","longitude_raw","lon_dev_raw",
+                "depth_raw","magnitude_raw_1","magnitude_type_raw_1",
+                "magnitude_raw_2","magnitude_type_raw_2",
+                "region_lead_raw","region_text_raw","shindo_raw"
+            ],
+            "processing_note": "No type conversion. Silver layer will cast & validate.",
         }
     )

@@ -171,7 +171,21 @@ def silver_quake_event(context, upstream):
             .withColumn("magnitude_2", col("magnitude_2").cast("float") / 10)
             .withColumn("shindo_value", map_shindo_udf(col("shindo"))))
 
-    return Output(df)
+    return Output(
+        df,
+        metadata={
+            "description": "Cleaned and typed earthquake events with coordinates, depth, magnitude, and shindo scale.",
+            "layer": "silver",
+            "primary_key": ["event_time", "latitude", "longitude", "depth"],
+            "datetime_column": "event_time",
+            "columns": [
+                "event_time","station_count","latitude","longitude","depth",
+                "magnitude_1","magnitude_type_1","magnitude_2","magnitude_type_2",
+                "shindo_value","region_lead","region_text"
+            ],
+            "format": "Parquet/Spark DataFrame"
+        }
+    )
 
 @multi_asset(
     ins={
@@ -215,7 +229,18 @@ def silver_dim_japan_province(context, upstream):
     n = provinces.count()
     context.log.info(f"Provinces loaded: {n}")
 
-    return Output(provinces, metadata={"num_records": n})
+    return Output(
+        provinces, 
+        metadata={"num_records": n},
+        metadata={
+            "description": "Dimensional table of Japan provinces with WKT geometry.",
+            "layer": "silver",
+            "primary_key": ["province_id"],
+            "columns": ["province_id","province_name","geometry"],
+            "geometry_type": "Polygon/MultiPolygon",
+            "source": "GADM v4.1"
+        }
+    )
 
 
 
@@ -227,26 +252,7 @@ def silver_dim_japan_province(context, upstream):
     outs={
         "silver_fact_earthquake_event": AssetOut(
             io_manager_key="psql_io_manager",
-            key_prefix=["silver", "fact"],
-            metadata={
-                "columns": [
-                    "event_id",
-                    "event_time",
-                    "station_count",
-                    "latitude",
-                    "longitude",
-                    "depth_km",
-                    "magnitude_1",
-                    "magnitude_type_1",
-                    "magnitude_2",
-                    "magnitude_type_2",
-                    "shindo_value",
-                    "province_id",
-                    "raw_place",
-                ],
-                "primary_key": ["event_id"],
-                "datetime_column": "event_time",
-            },
+            key_prefix=["silver", "fact"]
         )
     },
     compute_kind="Pyspark",
@@ -356,4 +362,20 @@ def silver_fact_earthquake_event(context, events, provinces):
     context.log.info(f"Sample fact rows:\n{df_fact.limit(5).toPandas()}")
 
 
-    return Output(df_fact, output_name="silver_fact_earthquake_event")
+    return Output(
+        df_fact, 
+        output_name="silver_fact_earthquake_event",
+        metadata={
+            "description": "Fact table linking earthquake events to Japanese provinces.",
+            "layer": "silver",
+            "primary_key": ["event_id"],
+            "datetime_column": "event_time",
+            "columns": [
+                "event_id","event_time","station_count","latitude","longitude",
+                "depth_km","magnitude_1","magnitude_type_1","magnitude_2",
+                "magnitude_type_2","shindo_value","province_id","raw_place"
+            ],
+            "grain": "One row per earthquake event",
+            "foreign_keys": {"province_id": "silver_dim_japan_province.province_id"}
+        }
+    )
