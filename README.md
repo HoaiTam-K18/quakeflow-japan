@@ -110,13 +110,19 @@ Gold Models --> Metabase Dashboard
 ## 🚀 How to Run
 
 1.  **Environment Setup**
-
     - Python 3.10+  
     - Run the following commands:
 
     ```bash
     make build
     make up
+
+    python -m venv .venv
+
+    source .venv/bin/activate (Mac)
+    .venv\Scripts\activate (Windows)
+
+    pip install -r requirements.txt
     ```
 
 2.  **Prepare Data**
