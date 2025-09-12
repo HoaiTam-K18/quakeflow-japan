@@ -1,27 +1,21 @@
-# 📘 README -- 地震 ETL パイプライン / Pipeline Động đất Nhật Bản
+# 📘 README -- Japan Earthquake ETL Pipeline
 
-## 🔎 プロジェクト概要 / Giới thiệu dự án
+## 🔎 Project Overview
 
-このプロジェクトは、日本の気象庁 (JMA) が公開する地震データを収集し、\
-ETL パイプラインで処理して、空間的に都道府県と関連付け、さらに BI
-(Metabase) で可視化することを目的としています。
+This project collects earthquake data published by the **Japan Meteorological Agency (JMA)**,  
+processes it through an **ETL pipeline**, links it spatially with Japanese prefectures,  
+and visualizes the results in **Metabase** for analysis.
 
-Dự án này thu thập dữ liệu động đất từ **Cơ quan Khí tượng Nhật Bản
-(JMA)**,\
-xây dựng **ETL pipeline** để xử lý & chuẩn hoá, liên kết với dữ liệu địa
-lý Nhật Bản, và hiển thị phân tích trên **Metabase**.
+-   **Framework**: Dagster  
+-   **Data lake**: MinIO (Bronze Layer)  
+-   **Processing**: Pandas, PySpark, Sedona  
+-   **Warehouse**: PostgreSQL (Silver Layer)  
+-   **BI**: Metabase (Gold Layer)  
+-   **Data Source**: [JMA Bulletin of Earthquakes](https://www.data.jma.go.jp/eqev/data/bulletin/hypo.html#nheader)
 
--   **Framework**: Dagster\
--   **Data lake**: MinIO (Bronze Layer)\
--   **Processing**: Pandas, PySpark, Sedona\
--   **Warehouse**: PostgreSQL (Silver Layer)\
--   **BI**: Metabase (Gold Layer)\
--   **Data Source**: [JMA 地震月報 / Bulletin of the
-    Earthquake](https://www.data.jma.go.jp/eqev/data/bulletin/hypo.html#nheader)
+---
 
-------------------------------------------------------------------------
-
-## 🏗️ アーキテクチャ / Kiến trúc pipeline
+## 🏗️ Pipeline Architecture
 
 ```
 Raw JMA text files --(Ingest)--> Bronze Layer (MinIO)
@@ -31,129 +25,126 @@ Silver Layer --> Gold Models (SQL Views / Tables)
 Gold Models --> Metabase Dashboard
 ```
 
-------------------------------------------------------------------------
+---
 
-## 🗂️ Asset 一覧 / Danh sách Asset
+## 🗂️ Assets
 
 ### **Bronze Layer**
 
--   **bronze_raw_text**\
-    日本語: 気象庁 (JMA) 提供の地震テキストデータを行単位で保存。\
-    Tiếng Việt: Dữ liệu text động đất gốc từ JMA, lưu từng dòng.
+-   **bronze_raw_text**  
+    Raw earthquake text data from JMA, stored line by line.
 
--   **bronze_raw_japan_geo**\
-    日本語: 日本の行政区域データ (GeoJSON、都道府県の境界)。\
-    Tiếng Việt: Dữ liệu bản đồ địa lý Nhật Bản (GeoJSON, ranh giới
-    tỉnh).
+-   **bronze_raw_japan_geo**  
+    Geographic data of Japanese administrative boundaries (GeoJSON, prefecture polygons).
 
--   **bronze_raw_sliced**\
-    日本語: 固定長 (96 文字)
-    フォーマットで各フィールドを分割したデータ。\
-    Tiếng Việt: Các dòng text đã cắt theo format cố định 96 ký tự, mỗi
-    trường tách riêng.
+-   **bronze_raw_sliced**  
+    Fixed-length (96 characters) text lines parsed into individual fields.
 
-------------------------------------------------------------------------
+---
 
 ### **Silver Layer**
 
--   **silver_quake_event**\
-    日本語: 緯度経度 (10進数)、深さ
-    (km)、マグニチュード、震度を正規化した地震データ。\
-    Tiếng Việt: Dữ liệu động đất đã chuẩn hoá: tọa độ (decimal), độ sâu
-    (km), magnitude, Shindo.
+-   **silver_quake_event**  
+    Normalized earthquake data: latitude/longitude (decimal), depth (km), magnitude, Shindo intensity.
 
--   **silver_dim_japan_province**\
-    日本語: 日本の都道府県リスト (WKT 形式のジオメトリを含む)。\
-    Tiếng Việt: Bảng dimension lưu danh sách tỉnh Nhật, với hình học
-    (WKT geometry).
+-   **silver_dim_japan_province**  
+    Prefecture dimension table with geometries (WKT format).
 
--   **silver_fact_earthquake_event**\
-    日本語:
-    空間結合で都道府県に関連付けられた地震イベントのファクトテーブル。\
-    Tiếng Việt: Bảng fact lưu các sự kiện động đất, gắn với tỉnh qua
-    join không gian.
+-   **silver_fact_earthquake_event**  
+    Fact table of earthquake events joined spatially with prefectures.
 
-------------------------------------------------------------------------
+---
 
 ### **Gold Layer (BI Models)**
 
--   **gold_total_quakes_by_year**\
-    日本語: 年ごとの地震回数を集計。\
-    Tiếng Việt: Thống kê tổng số trận động đất theo năm.
+-   **gold_total_quakes_by_year**  
+    Annual earthquake counts.
 
--   **gold_earthquake_by_month**\
-    日本語: 月ごとの地震回数を集計。\
-    Tiếng Việt: Thống kê động đất theo từng tháng.
+-   **gold_earthquake_by_month**  
+    Monthly earthquake counts.
 
--   **gold_earthquake_by_province**\
-    日本語: 都道府県ごとの地震回数を集計。\
-    Tiếng Việt: Số lượng động đất theo từng tỉnh.
+-   **gold_earthquake_by_province**  
+    Earthquake counts by prefecture.
 
--   **gold_earthquake_by_province_year**\
-    日本語: 年 × 都道府県ごとの地震回数を集計。\
-    Tiếng Việt: Số lượng động đất theo tỉnh theo từng năm.
+-   **gold_earthquake_by_province_year**  
+    Yearly earthquake counts per prefecture.
 
--   **gold_earthquake_magnitude_distribution**\
-    日本語: マグニチュード区間ごとの地震分布。\
-    Tiếng Việt: Phân phối động đất theo độ lớn (Magnitude).
+-   **gold_earthquake_magnitude_distribution**  
+    Distribution of earthquakes by magnitude ranges.
 
--   **gold_earthquake_depth_distribution**\
-    日本語: 深さ (km) ごとの地震分布。\
-    Tiếng Việt: Phân phối động đất theo độ sâu (Depth).
+-   **gold_earthquake_depth_distribution**  
+    Distribution of earthquakes by depth (km).
 
--   **gold_quake_shindo_proportion**\
-    日本語: 震度の割合を計算。\
-    Tiếng Việt: Tỷ lệ động đất theo cấp độ Shindo.
+-   **gold_quake_shindo_proportion**  
+    Proportion of earthquakes by Shindo intensity.
 
-------------------------------------------------------------------------
+---
 
-## 📊 データモデル / Mô hình dữ liệu
+## 📊 Data Model
 
 -   **Dimension Table**:
     -   `silver_dim_japan_province (province_id, province_name, geometry)`
+
 -   **Fact Table**:
     -   `silver_fact_earthquake_event (event_id, event_time, station_count, latitude, longitude, depth_km, magnitude, shindo_value, province_id, raw_place)`
+
 -   **Gold Models (BI-ready)**:
-    -   Tổng hợp dữ liệu từ Fact → dùng cho Metabase dashboard.
+    -   Aggregated views derived from the fact table, consumed by Metabase dashboards.
 
-------------------------------------------------------------------------
+---
 
-## 🛠️ 技術スタック / Công nghệ sử dụng
+## 🛠️ Tech Stack
 
-  技術 (Japanese)              Công nghệ (Vietnamese)
-  ---------------------------- -------------------------
-  データオーケストレーション   Dagster
-  データレイク                 MinIO
-  データ処理                   Pandas, PySpark
-  空間処理                     Apache Sedona
-  データウェアハウス           PostgreSQL
-  BI / 可視化                  Metabase
-  ストレージ形式               JSON, Parquet, WKT, SQL
+| Category               | Technology           |
+|------------------------|----------------------|
+| Orchestration          | Dagster              |
+| Data Lake              | MinIO                |
+| Data Processing        | Pandas, PySpark      |
+| Spatial Processing     | Apache Sedona        |
+| Data Warehouse         | PostgreSQL           |
+| BI / Visualization     | Metabase             |
+| Storage Formats        | JSON, Parquet, WKT, SQL |
 
-------------------------------------------------------------------------
+---
 
-## 🚀 実行方法 / Cách chạy
+## 🚀 How to Run
 
-1.  **環境セットアップ / Thiết lập môi trường**
+1.  **Environment Setup**
 
-    -   Python 3.10+\
-    -   Cài đặt Dagster, PySpark, Sedona\
-    -   Chạy MinIO & PostgreSQL
+    - Python 3.10+  
+    - Run the following commands:
 
-2.  **データ配置 / Chuẩn bị dữ liệu**
-
-    -   Raw JMA text files → `./data/raw`\
-    -   GeoJSON Japan → `./data/geo/gadm41_JPN_1.json`
-
-3.  **パイプライン実行 / Chạy pipeline**
-
-    ``` bash
-    dagster dev
+    ```bash
+    make build
+    make up
     ```
 
-4.  **結果確認 / Kiểm tra kết quả**
+2.  **Prepare Data**
 
-    -   Bronze layer → MinIO\
-    -   Silver layer (dim/fact) → PostgreSQL\
-    -   Gold models (SQL) → PostgreSQL views / tables\
-    -   BI → Metabase dashboard
+    - Place raw JMA text files into `./data/raw`  
+    - Place Japan GeoJSON into `./data/geo/gadm41_JPN_1.json`
+
+3. **Database Setup**
+    - Run the provided SQL script on PostgreSQL to create the database and schemas:
+    - file: scripts/psql_scripts
+
+4.  **Run Pipeline**
+
+    ```bash
+    cd etl_pipeline
+    dagster dev -m etl_pipeline
+    ```
+
+5.  **Run dbt**
+
+    ```bash
+    cd etl_pipeline
+    dbt run --profiles-dir analytics --project-dir analytics
+    ```
+
+5.  **Check Results**
+
+    - Bronze layer → MinIO  
+    - Silver layer (dim/fact) → PostgreSQL  
+    - Gold models (SQL) → PostgreSQL views / tables  
+    - BI → Metabase dashboard  
